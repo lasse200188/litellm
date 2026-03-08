@@ -204,6 +204,18 @@ export interface CredentialItem {
   };
 }
 
+export interface CredentialImportModelsResponse {
+  success: boolean;
+  provider: string;
+  credential_name: string;
+  counts: {
+    created: number;
+    updated: number;
+    failed_tests: number;
+    failed_create: number;
+  };
+}
+
 export interface ProviderCredentialFieldMetadata {
   key: string;
   label: string;
@@ -3480,6 +3492,38 @@ export const credentialUpdateCall = async (
     // Handle success - you might want to update some state or UI based on the created key
   } catch (error) {
     console.error("Failed to create key:", error);
+    throw error;
+  }
+};
+
+export const credentialImportModelsCall = async (
+  accessToken: string,
+  credentialName: string,
+): Promise<CredentialImportModelsResponse> => {
+  try {
+    const encodedCredentialName = encodeURIComponent(credentialName);
+    const url = proxyBaseUrl
+      ? `${proxyBaseUrl}/credentials/${encodedCredentialName}/import_models`
+      : `/credentials/${encodedCredentialName}/import_models`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        [globalLitellmHeaderName]: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = deriveErrorMessage(errorData);
+      handleError(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Failed to import models for credential:", error);
     throw error;
   }
 };

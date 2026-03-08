@@ -1,10 +1,11 @@
 import {
   credentialCreateCall,
   credentialDeleteCall,
+  credentialImportModelsCall,
   CredentialItem,
   credentialUpdateCall,
 } from "@/components/networking"; // Assume this is your networking function
-import { PencilAltIcon, TrashIcon } from "@heroicons/react/outline";
+import { PencilAltIcon, RefreshIcon, TrashIcon } from "@heroicons/react/outline";
 import {
   Badge,
   Button,
@@ -41,6 +42,7 @@ const CredentialsPanel: React.FC<CredentialsPanelProps> = ({ uploadProps }) => {
   const [credentialToDelete, setCredentialToDelete] = useState<CredentialItem | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isCredentialDeleting, setIsCredentialDeleting] = useState(false);
+  const [isImportingCredentialName, setIsImportingCredentialName] = useState<string | null>(null);
   const [form] = Form.useForm();
 
   const restrictedFields = ["credential_name", "custom_llm_provider"];
@@ -135,6 +137,27 @@ const CredentialsPanel: React.FC<CredentialsPanelProps> = ({ uploadProps }) => {
     setIsDeleteModalOpen(false);
   };
 
+  const isOpenrouterCredential = (credential: CredentialItem) => {
+    return (credential.credential_info?.custom_llm_provider || "").toLowerCase() === "openrouter";
+  };
+
+  const handleImportCredentialModels = async (credential: CredentialItem) => {
+    if (!accessToken || !isOpenrouterCredential(credential)) {
+      return;
+    }
+    setIsImportingCredentialName(credential.credential_name);
+    try {
+      const result = await credentialImportModelsCall(accessToken, credential.credential_name);
+      NotificationsManager.success(
+        `Import complete. Created: ${result.counts.created}, Updated: ${result.counts.updated}, Test failures: ${result.counts.failed_tests}, Create failures: ${result.counts.failed_create}`,
+      );
+    } catch (error) {
+      NotificationsManager.error("Failed to import models for credential");
+    } finally {
+      setIsImportingCredentialName(null);
+    }
+  };
+
   return (
     <div className="w-full mx-auto flex-auto overflow-y-auto p-2">
       <Button onClick={() => setIsAddModalOpen(true)}>Add Credential</Button>
@@ -181,6 +204,20 @@ const CredentialsPanel: React.FC<CredentialsPanelProps> = ({ uploadProps }) => {
                       size="sm"
                       onClick={() => openDeleteModal(credential)}
                       className="ml-2"
+                    />
+                    <Button
+                      icon={RefreshIcon}
+                      variant="light"
+                      size="sm"
+                      className="ml-2"
+                      title={
+                        isOpenrouterCredential(credential)
+                          ? "Load all OpenRouter models"
+                          : "Coming later: Requesty support"
+                      }
+                      loading={isImportingCredentialName === credential.credential_name}
+                      disabled={!isOpenrouterCredential(credential)}
+                      onClick={() => handleImportCredentialModels(credential)}
                     />
                   </TableCell>
                 </TableRow>
